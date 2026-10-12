@@ -1,0 +1,23 @@
+<?php
+require_once __DIR__.'/../includes/functions.php';admin_required();
+$error='';
+if($_SERVER['REQUEST_METHOD']==='POST'){verify_csrf();$action=$_POST['action']??'save';
+ try{
+  if($action==='toggle'){$id=(int)($_POST['id']??0);$s=db()->prepare('UPDATE productos SET activo=IF(activo=1,0,1) WHERE id=?');$s->execute([$id]);set_flash('Estado del producto actualizado.');redirect('admin/productos.php');}
+  $id=(int)($_POST['id']??0);$nombre=trim((string)($_POST['nombre']??''));$descripcion=trim((string)($_POST['descripcion']??''));$precio=filter_var($_POST['precio']??null,FILTER_VALIDATE_FLOAT);$stock=filter_var($_POST['stock']??null,FILTER_VALIDATE_INT);$cat=(int)($_POST['categoria_id']??0);$imagen=trim((string)($_POST['imagen']??''));
+  if($nombre===''||$precio===false||$precio<0||$stock===false||$stock<0)throw new RuntimeException('Revisa nombre, precio y stock.');
+  if($imagen!==''&&!filter_var($imagen,FILTER_VALIDATE_URL))throw new RuntimeException('La imagen debe ser una URL válida. Puedes dejar el campo vacío.');
+  if($id){$s=db()->prepare('UPDATE productos SET categoria_id=?,nombre=?,descripcion=?,precio=?,stock=?,imagen=? WHERE id=?');$s->execute([$cat?:null,$nombre,$descripcion,$precio,$stock,$imagen?:null,$id]);}
+  else{$s=db()->prepare('INSERT INTO productos(categoria_id,nombre,descripcion,precio,stock,imagen) VALUES(?,?,?,?,?,?)');$s->execute([$cat?:null,$nombre,$descripcion,$precio,$stock,$imagen?:null]);}
+  set_flash('Producto guardado correctamente.');redirect('admin/productos.php');
+ }catch(Throwable $ex){$error=$ex instanceof RuntimeException?$ex->getMessage():'No se pudo guardar el producto.';}
+}
+$edit=null;if(isset($_GET['edit'])){$s=db()->prepare('SELECT * FROM productos WHERE id=?');$s->execute([(int)$_GET['edit']]);$edit=$s->fetch();}
+$cats=db()->query('SELECT * FROM categorias WHERE activa=1 ORDER BY nombre')->fetchAll();
+$list=db()->query('SELECT p.*,c.nombre categoria FROM productos p LEFT JOIN categorias c ON c.id=p.categoria_id ORDER BY p.id DESC')->fetchAll();
+$pageTitle='Productos';require __DIR__.'/../includes/header.php';
+?>
+<div class="section-head"><div><div class="eyebrow">Administración</div><h1>Productos</h1><p class="muted">Registra y actualiza el catálogo.</p></div><a class="btn secondary" href="<?= e(url('admin/index.php')) ?>">← Panel</a></div>
+<?php if($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
+<div class="grid-two"><section class="form-card"><h2><?= $edit?'Editar producto':'Nuevo producto' ?></h2><form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="save"><input type="hidden" name="id" value="<?= (int)($edit['id']??0) ?>"><label>Nombre *</label><input name="nombre" required value="<?= e($edit['nombre']??'') ?>"><label>Descripción</label><textarea name="descripcion" rows="3"><?= e($edit['descripcion']??'') ?></textarea><div class="form-row"><div><label>Precio (S/) *</label><input type="number" name="precio" min="0" step="0.01" required value="<?= e((string)($edit['precio']??'')) ?>"></div><div><label>Stock *</label><input type="number" name="stock" min="0" step="1" required value="<?= e((string)($edit['stock']??0)) ?>"></div></div><label>Categoría</label><select name="categoria_id"><option value="0">General / sin categoría</option><?php foreach($cats as $c): ?><option value="<?= (int)$c['id'] ?>" <?= ((int)($edit['categoria_id']??0)===(int)$c['id'])?'selected':'' ?>><?= e($c['nombre']) ?></option><?php endforeach; ?></select><label>URL de imagen (opcional)</label><input name="imagen" type="url" placeholder="https://..." value="<?= e($edit['imagen']??'') ?>"><p><button>Guardar producto</button> <?php if($edit): ?><a class="btn secondary" href="<?= e(url('admin/productos.php')) ?>">Cancelar</a><?php endif; ?></p></form></section><section class="panel"><h2>Catálogo registrado</h2><div class="table-wrap"><table><thead><tr><th>Producto</th><th>Precio</th><th>Stock</th><th>Estado</th><th>Acción</th></tr></thead><tbody><?php foreach($list as $p): ?><tr><td><strong><?= e($p['nombre']) ?></strong><div class="muted"><?= e($p['categoria']??'General') ?></div></td><td><?= money($p['precio']) ?></td><td><?= (int)$p['stock'] ?></td><td><?= (int)$p['activo']?'Activo':'Oculto' ?></td><td><a href="<?= e(url('admin/productos.php?edit='.(int)$p['id'])) ?>">Editar</a><form method="post" style="margin-top:6px"><?= csrf_field() ?><input type="hidden" name="action" value="toggle"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>"><button class="secondary" style="padding:6px 9px;font-size:12px"><?= (int)$p['activo']?'Ocultar':'Activar' ?></button></form></td></tr><?php endforeach; ?></tbody></table></div></section></div>
+<?php require __DIR__.'/../includes/footer.php'; ?>

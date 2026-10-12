@@ -1,0 +1,11 @@
+<?php
+require_once __DIR__.'/../includes/functions.php';admin_required();
+$products=(int)db()->query('SELECT COUNT(*) FROM productos')->fetchColumn();
+$orders=(int)db()->query("SELECT COUNT(*) FROM pedidos WHERE estado NOT IN ('entregado','cancelado')")->fetchColumn();
+$sales=(float)db()->query('SELECT COALESCE(SUM(total),0) FROM ventas')->fetchColumn();
+$recent=db()->query('SELECT id,codigo,cliente_nombre,total,estado,creado_en FROM pedidos ORDER BY id DESC LIMIT 8')->fetchAll();
+$pageTitle='Panel de administración';require __DIR__.'/../includes/header.php';
+?>
+<div class="section-head"><div><div class="eyebrow">Panel de control</div><h1>Hola, <?= e($_SESSION['admin_nombre']??'Administrador') ?></h1><p class="muted">Resumen general de AMORYA.</p></div><a class="btn secondary" href="<?= e(url('admin/logout.php')) ?>">Cerrar sesión</a></div>
+<div class="admin-layout"><aside class="admin-nav"><strong>MENÚ</strong><a href="<?= e(url('admin/index.php')) ?>">Resumen</a><a href="<?= e(url('admin/productos.php')) ?>">Productos</a><a href="<?= e(url('admin/pedidos.php')) ?>">Pedidos y ventas</a><a href="<?= e(url('index.php')) ?>" target="_blank" rel="noopener">Ver tienda ↗</a></aside><section><div class="stats"><div class="stat"><span class="muted">Productos registrados</span><strong><?= $products ?></strong></div><div class="stat"><span class="muted">Pedidos pendientes/en proceso</span><strong><?= $orders ?></strong></div><div class="stat"><span class="muted">Ventas registradas</span><strong><?= money($sales) ?></strong></div></div><div class="panel"><h2>Pedidos recientes</h2><?php if(!$recent): ?><p class="muted">Todavía no hay pedidos.</p><?php else: ?><div class="table-wrap"><table><thead><tr><th>Código</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Fecha</th></tr></thead><tbody><?php foreach($recent as $r): ?><tr><td><a href="<?= e(url('admin/pedidos.php?id='.(int)$r['id'])) ?>"><strong><?= e($r['codigo']) ?></strong></a></td><td><?= e($r['cliente_nombre']) ?></td><td><?= money($r['total']) ?></td><td><?= e($r['estado']) ?></td><td><?= e($r['creado_en']) ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?></div></section></div>
+<?php require __DIR__.'/../includes/footer.php'; ?>
